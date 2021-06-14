@@ -981,6 +981,18 @@ class BetterPlayerController {
         _wasPlayingBeforePause ??= isPlaying();
         pause();
       }
+    } else if (_betterPlayerGlobalKey != null) {
+      if (Platform.isAndroid) {
+        if (appLifecycleState == AppLifecycleState.inactive) {
+          enablePictureInPicture(_betterPlayerGlobalKey!);
+        }
+      } else {
+        if (appLifecycleState == AppLifecycleState.resumed) {
+          disablePictureInPicture();
+        } else if (appLifecycleState == AppLifecycleState.paused) {
+          enablePictureInPicture(_betterPlayerGlobalKey!);
+        }
+      }
     }
   }
 
@@ -1053,6 +1065,14 @@ class BetterPlayerController {
       throw StateError("The data source has not been initialized");
     }
     return videoPlayerController!.disablePictureInPicture();
+  }
+
+  ///Check if picture in picture mode is currently active.
+  bool isPip() {
+    if (videoPlayerController == null) {
+      throw StateError("The data source has not been initialized");
+    }
+    return videoPlayerController!.value.isPip;
   }
 
   // ignore: use_setters_to_change_properties

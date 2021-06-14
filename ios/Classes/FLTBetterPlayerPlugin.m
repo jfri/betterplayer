@@ -62,6 +62,7 @@ int64_t FLTNSTimeIntervalToMillis(NSTimeInterval interval) {
 @property(nonatomic) bool isStalledCheckStarted;
 @property(nonatomic) float playerRate;
 @property(nonatomic) AVPlayerTimeControlStatus lastAvPlayerTimeControlStatus;
+@property(nonatomic) NSDictionary* nowPlayingInfo;
 - (void)play;
 - (void)pause;
 - (void)setIsLooping:(bool)isLooping;
@@ -312,8 +313,10 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         item = [AVPlayerItem playerItemWithAsset:asset];
     }
     
-    if (@available(iOS 10.0, *) && overriddenDuration > 0) {
-        item.forwardPlaybackEndTime = CMTimeMake(overriddenDuration/1000, 1);
+    if (@available(iOS 10.0, *)) {
+        if (overriddenDuration > 0) {
+            item.forwardPlaybackEndTime = CMTimeMake(overriddenDuration/1000, 1);
+        }
     }
     
     return [self setDataSourcePlayerItem:item withKey:key];
@@ -467,7 +470,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         switch (item.status) {
             case AVPlayerItemStatusFailed:
                 NSLog(@"Failed to load video:");
-                NSLog(item.error.debugDescription);
+                NSLog(@"%@", item.error.debugDescription);
                 
                 if (_eventSink != nil) {
                     _eventSink([FlutterError
@@ -523,6 +526,8 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         [_player pause];
     }
     _displayLink.paused = !_isPlaying;
+    
+    [self updateNowPlaying];
 }
 
 - (void)onReadyToPlay {
@@ -568,6 +573,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
             @"height" : @(fabs(realSize.height) ? : height),
             @"key" : _key
         });
+        
+        [self usePlayerLayer:CGRectMake(0, 0, fabs(realSize.width) ? : width, fabs(realSize.height) ? : height)];
+        __playerLayer.opacity = 0.0f;
     }
 }
 
@@ -661,7 +669,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 
-- (void)setTrackParameters:(int) width: (int) height: (int)bitrate {
+- (void)setTrackParameters:(int)width : (int)height: (int)bitrate {
     _player.currentItem.preferredPeakBitRate = bitrate;
     if (@available(iOS 11.0, *)) {
         if (width == 0 && height == 0){
@@ -712,8 +720,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 - (void) enablePictureInPicture: (CGRect) frame{
-    [self disablePictureInPicture];
-    [self usePlayerLayer:frame];
+    self._playerLayer.frame = frame;
+    self._playerLayer.opacity = 1.0f;
+    [self setPictureInPicture:YES];
 }
 
 - (void)usePlayerLayer: (CGRect) frame
@@ -724,27 +733,22 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         self._playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
         UIViewController* vc = [[[UIApplication sharedApplication] keyWindow] rootViewController];
         self._playerLayer.frame = frame;
+        self._playerLayer.opacity = 1.0f;
         self._playerLayer.needsDisplayOnBoundsChange = YES;
-        //  [self._playerLayer addObserver:self forKeyPath:readyForDisplayKeyPath options:NSKeyValueObservingOptionNew context:nil];
         [vc.view.layer addSublayer:self._playerLayer];
         vc.view.layer.needsDisplayOnBoundsChange = YES;
         if (@available(iOS 9.0, *)) {
             _pipController = NULL;
         }
         [self setupPipController];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            [self setPictureInPicture:true];
-        });
     }
 }
 
 - (void)disablePictureInPicture
 {
-    [self setPictureInPicture:true];
+    [self setPictureInPicture:NO];
     if (__playerLayer){
-        [self._playerLayer removeFromSuperlayer];
-        self._playerLayer = nil;
+        self._playerLayer.opacity = 0.0f;
         if (_eventSink != nil) {
             _eventSink(@{@"event" : @"pipStop"});
         }
@@ -779,17 +783,17 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     [self setRestoreUserInterfaceForPIPStopCompletionHandler: true];
 }
 
-- (void) setAudioTrack:(NSString*) name index:(int) index{
+- (void) setAudioTrack:(NSString*)name index:(int)index {
     AVMediaSelectionGroup *audioSelectionGroup = [[[_player currentItem] asset] mediaSelectionGroupForMediaCharacteristic: AVMediaCharacteristicAudible];
     NSArray* options = audioSelectionGroup.options;
     
     
-    for (int index = 0; index < [options count]; index++) {
-        AVMediaSelectionOption* option = [options objectAtIndex:index];
+    for (int i = 0; i < [options count]; i++) {
+        AVMediaSelectionOption* option = [options objectAtIndex:i];
         NSArray *metaDatas = [AVMetadataItem metadataItemsFromArray:option.commonMetadata withKey:@"title" keySpace:@"comn"];
         if (metaDatas.count > 0) {
             NSString *title = ((AVMetadataItem*)[metaDatas objectAtIndex:0]).stringValue;
-            if (title == name && index == index ){
+            if (title == name && index == i) {
                 [[_player currentItem] selectMediaOption:option inMediaSelectionGroup: audioSelectionGroup];
             }
         }
@@ -818,8 +822,8 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     if (_prevBuffer) {
         CVPixelBufferLockBaseAddress(_prevBuffer, 0);
         
-        int bufferWidth = CVPixelBufferGetWidth(_prevBuffer);
-        int bufferHeight = CVPixelBufferGetHeight(_prevBuffer);
+        size_t bufferWidth = CVPixelBufferGetWidth(_prevBuffer);
+        size_t bufferHeight = CVPixelBufferGetHeight(_prevBuffer);
         unsigned char* pixel = (unsigned char*)CVPixelBufferGetBaseAddress(_prevBuffer);
         
         for (int row = 0; row < bufferHeight; row++) {
@@ -894,7 +898,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         [_displayLink invalidate];
     }
     @catch(NSException *exception) {
-        NSLog(exception.debugDescription);
+        NSLog(@"%@", exception.debugDescription);
     }
 }
 
@@ -904,7 +908,150 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     [_eventChannel setStreamHandler:nil];
     [self disablePictureInPicture];
     [self setPictureInPicture:false];
+    [self._playerLayer removeFromSuperlayer];
+    self._playerLayer = nil;
     _disposed = true;
+}
+
+- (void)disableNowPlaying {
+  [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nil;
+
+  MPRemoteCommandCenter *commandCenter = [MPRemoteCommandCenter sharedCommandCenter];
+
+  [commandCenter.togglePlayPauseCommand setEnabled:NO];
+  [commandCenter.togglePlayPauseCommand removeTarget:self];
+
+  [commandCenter.stopCommand removeTarget:self];
+  [commandCenter.pauseCommand removeTarget:self];
+  [commandCenter.playCommand removeTarget:self];
+
+  if (@available(iOS 9.1, *)) {
+    [commandCenter.changePlaybackPositionCommand removeTarget:self];
+  }
+
+  [commandCenter.skipForwardCommand removeTarget:self];
+  [commandCenter.skipBackwardCommand removeTarget:self];
+  [commandCenter.stopCommand removeTarget:self];
+}
+
+- (void)updateNowPlayingInfoCenter:(NSDictionary*)info {
+  _nowPlayingInfo = info;
+  [self updateNowPlaying];
+}
+
+- (void)updateNowPlaying {
+  if (_nowPlayingInfo == NULL) {
+    [self disableNowPlaying];
+    return;
+  }
+
+  NSMutableDictionary *nowPlayingInfo = [NSMutableDictionary new];
+  nowPlayingInfo[MPMediaItemPropertyTitle] = _nowPlayingInfo[@"title"];
+  nowPlayingInfo[MPMediaItemPropertyArtist] = _nowPlayingInfo[@"artist"];
+  nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = _nowPlayingInfo[@"album"];
+  nowPlayingInfo[MPMediaItemPropertyGenre] = _nowPlayingInfo[@"genre"];
+
+  NSString* artUri = _nowPlayingInfo[@"imageUrl"];
+  if (artUri != NULL) {
+    NSData* data = [NSData dataWithContentsOfURL:[NSURL URLWithString:artUri]];
+    UIImage* artwork = [UIImage imageWithData:data];
+    if (artwork != NULL) {
+      nowPlayingInfo[MPMediaItemPropertyArtwork] = [[MPMediaItemArtwork alloc] initWithImage:artwork];
+    }
+  }
+
+  nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = [NSNumber numberWithFloat:CMTimeGetSeconds(_player.currentItem.currentTime)];
+  nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = [NSNumber numberWithFloat:CMTimeGetSeconds(_player.currentItem.duration)];
+  nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = [NSNumber numberWithFloat:_player.rate];
+
+  [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:nowPlayingInfo];
+
+  MPRemoteCommandCenter *commandCenter = [MPRemoteCommandCenter sharedCommandCenter];
+
+  [commandCenter.togglePlayPauseCommand setEnabled:NO];
+  [commandCenter.togglePlayPauseCommand removeTarget:self];
+  [commandCenter.togglePlayPauseCommand setEnabled:YES];
+  [commandCenter.togglePlayPauseCommand addTarget:self action:@selector(togglePlayPause:)];
+
+  [commandCenter.stopCommand removeTarget:self];
+  [commandCenter.stopCommand addTarget:self action:@selector(stop:)];
+
+  [commandCenter.pauseCommand removeTarget:self];
+  [commandCenter.pauseCommand addTarget:self action:@selector(pause:)];
+
+  [commandCenter.playCommand removeTarget:self];
+  [commandCenter.playCommand addTarget:self action:@selector(play:)];
+
+  if (@available(iOS 9.1, *)) {
+    [commandCenter.changePlaybackPositionCommand removeTarget:self];
+    [commandCenter.changePlaybackPositionCommand addTarget:self action:@selector(changePlaybackPosition:)];
+  }
+
+  [commandCenter.skipForwardCommand removeTarget:self];
+  [commandCenter.skipForwardCommand addTarget:self action:@selector(skipForwardCommand:)];
+  NSNumber *fastForwardIntervalInSec = [NSNumber numberWithInt:10];
+  commandCenter.skipForwardCommand.preferredIntervals = @[fastForwardIntervalInSec];
+
+  [commandCenter.skipBackwardCommand removeTarget:self];
+  [commandCenter.skipBackwardCommand addTarget:self action:@selector(skipBackwardCommand:)];
+  NSNumber *rewindIntervalInSec = [NSNumber numberWithInt:10];
+  commandCenter.skipBackwardCommand.preferredIntervals = @[rewindIntervalInSec];
+
+  [commandCenter.stopCommand removeTarget:self];
+  [commandCenter.stopCommand addTarget:self action:@selector(stop:)];
+}
+
+- (MPRemoteCommandHandlerStatus)togglePlayPause:(MPRemoteCommandEvent*)event {
+  if (_isPlaying) {
+    [self pause];
+  } else {
+    [self play];
+  }
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)stop:(MPRemoteCommandEvent*)event {
+  [self pause];
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)pause:(MPRemoteCommandEvent*)event {
+  [self pause];
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)play:(MPRemoteCommandEvent*)event {
+  [self play];
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)changePlaybackPosition:(MPChangePlaybackPositionCommandEvent*)event {
+  [self seekTo:[NSNumber numberWithDouble:event.positionTime * 1000].intValue];
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)skipForwardCommand:(MPSeekCommandEvent*)event {
+  CMTime currentTime = _player.currentTime;
+  CMTime interval = CMTimeMake(((MPSkipIntervalCommandEvent*)event).interval * 1000, 1000);
+  CMTime skipTime = CMTimeAdd(currentTime, interval);
+
+  [_player seekToTime:skipTime
+      toleranceBefore:kCMTimeZero
+       toleranceAfter:kCMTimeZero];
+
+  return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (MPRemoteCommandHandlerStatus)skipBackwardCommand:(MPSeekCommandEvent*)event {
+  CMTime currentTime = _player.currentTime;
+  CMTime interval = CMTimeMake(((MPSkipIntervalCommandEvent*)event).interval * 1000, 1000);
+  CMTime skipTime = CMTimeSubtract(currentTime, interval);
+
+  [_player seekToTime:skipTime
+      toleranceBefore:kCMTimeZero
+       toleranceAfter:kCMTimeZero];
+
+  return MPRemoteCommandHandlerStatusSuccess;
 }
 
 @end
@@ -977,147 +1124,31 @@ NSMutableDictionary*  _artworkImageDict;
     if (showNotificationObject != [NSNull null]) {
         showNotification = [[dataSource objectForKey:@"showNotification"] boolValue];
     }
-    NSString* title = dataSource[@"title"];
-    NSString* author = dataSource[@"author"];
-    NSString* imageUrl = dataSource[@"imageUrl"];
     
-    if (showNotification){
-        [self setRemoteCommandsNotificationActive];
-        [self setupRemoteCommands: player];
-        [self setupRemoteCommandNotification: player, title, author, imageUrl];
-        [self setupUpdateListener: player, title, author, imageUrl];
+    if (showNotification) {
+        [[AVAudioSession sharedInstance] setActive:YES error:nil];
+        [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
+        
+        [player updateNowPlayingInfoCenter:dataSource];
+    } else {
+        [player disableNowPlaying];
+        [self setRemoteCommandsNotificationNotActive];
     }
-}
-
-- (void) setRemoteCommandsNotificationActive{
-    [[AVAudioSession sharedInstance] setActive:true error:nil];
-    [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
 }
 
 - (void) setRemoteCommandsNotificationNotActive{
     if ([_players count] == 0) {
-        [[AVAudioSession sharedInstance] setActive:false error:nil];
+        [[AVAudioSession sharedInstance] setActive:NO error:nil];
     }
     
     [[UIApplication sharedApplication] endReceivingRemoteControlEvents];
 }
-
-
-- (void) setupRemoteCommands:(FLTBetterPlayer*)player  {
-    MPRemoteCommandCenter *commandCenter = [MPRemoteCommandCenter sharedCommandCenter];
-    [commandCenter.togglePlayPauseCommand setEnabled:YES];
-    [commandCenter.playCommand setEnabled:YES];
-    [commandCenter.pauseCommand setEnabled:YES];
-    [commandCenter.nextTrackCommand setEnabled:NO];
-    [commandCenter.previousTrackCommand setEnabled:NO];
-    if (@available(iOS 9.1, *)) {
-        [commandCenter.changePlaybackPositionCommand setEnabled:YES];
-    }
-    
-    [commandCenter.togglePlayPauseCommand addTargetWithHandler: ^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        if (player.isPlaying){
-            player.eventSink(@{@"event" : @"play"});
-        } else {
-            player.eventSink(@{@"event" : @"pause"});
-            
-        }
-        return MPRemoteCommandHandlerStatusSuccess;
-    }];
-    
-    [commandCenter.playCommand addTargetWithHandler: ^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        player.eventSink(@{@"event" : @"play"});
-        return MPRemoteCommandHandlerStatusSuccess;
-    }];
-    
-    [commandCenter.pauseCommand addTargetWithHandler: ^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        player.eventSink(@{@"event" : @"pause"});
-        return MPRemoteCommandHandlerStatusSuccess;
-    }];
-    
-    
-    
-    if (@available(iOS 9.1, *)) {
-        [commandCenter.changePlaybackPositionCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-            
-            MPChangePlaybackPositionCommandEvent * playbackEvent = (MPChangePlaybackRateCommandEvent * ) event;
-            CMTime time = CMTimeMake(playbackEvent.positionTime, 1);
-            int64_t millis = FLTCMTimeToMillis(time);
-            [player seekTo: millis];
-            player.eventSink(@{@"event" : @"seek", @"position": @(millis)});
-            return MPRemoteCommandHandlerStatusSuccess;
-        }];
-        
-    }
-}
-
-- (void) setupRemoteCommandNotification:(FLTBetterPlayer*)player, NSString* title, NSString* author , NSString* imageUrl{
-    float positionInSeconds = player.position /1000;
-    float durationInSeconds = player.duration/ 1000;
-    
-    
-    NSMutableDictionary * nowPlayingInfoDict = [@{MPMediaItemPropertyArtist: author,
-                                                  MPMediaItemPropertyTitle: title,
-                                                  MPNowPlayingInfoPropertyElapsedPlaybackTime: [ NSNumber numberWithFloat : positionInSeconds],
-                                                  MPMediaItemPropertyPlaybackDuration: [NSNumber numberWithFloat:durationInSeconds],
-                                                  MPNowPlayingInfoPropertyPlaybackRate: @1,
-    } mutableCopy];
-    
-    if (imageUrl != [NSNull null]){
-        NSString* key =  [self getTextureId:player];
-        MPMediaItemArtwork* artworkImage = [_artworkImageDict objectForKey:key];
-        
-        if (key != [NSNull null]){
-            if (artworkImage){
-                [nowPlayingInfoDict setObject:artworkImage forKey:MPMediaItemPropertyArtwork];
-                [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nowPlayingInfoDict;
-                
-            } else {
-                dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-                dispatch_async(queue, ^{
-                    @try{
-                        UIImage * tempArtworkImage = nil;
-                        if ([imageUrl rangeOfString:@"http"].location == NSNotFound){
-                            tempArtworkImage = [UIImage imageWithContentsOfFile:imageUrl];
-                        } else {
-                            NSURL *nsImageUrl =[NSURL URLWithString:imageUrl];
-                            tempArtworkImage = [UIImage imageWithData:[NSData dataWithContentsOfURL:nsImageUrl]];
-                        }
-                        if(tempArtworkImage)
-                        {
-                            MPMediaItemArtwork* artworkImage = [[MPMediaItemArtwork alloc] initWithImage: tempArtworkImage];
-                            [_artworkImageDict setObject:artworkImage forKey:key];
-                            [nowPlayingInfoDict setObject:artworkImage forKey:MPMediaItemPropertyArtwork];
-                        }
-                        [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nowPlayingInfoDict;
-                    }
-                    @catch(NSException *exception) {
-                        
-                    }
-                });
-            }
-        }
-    } else {
-        [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nowPlayingInfoDict;
-    }
-}
-
-
 
 - (NSString*) getTextureId: (FLTBetterPlayer*) player{
     NSArray* temp = [_players allKeysForObject: player];
     NSString* key = [temp lastObject];
     return key;
 }
-
-- (void) setupUpdateListener:(FLTBetterPlayer*)player,NSString* title, NSString* author,NSString* imageUrl  {
-    id _timeObserverId = [player.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 1) queue:NULL usingBlock:^(CMTime time){
-        [self setupRemoteCommandNotification:player, title, author, imageUrl];
-    }];
-    
-    NSString* key =  [self getTextureId:player];
-    [ _timeObserverIdDict setObject:_timeObserverId forKey: key];
-}
-
 
 - (void) disposeNotificationData: (FLTBetterPlayer*)player{
     NSString* key =  [self getTextureId:player];
