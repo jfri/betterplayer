@@ -438,28 +438,27 @@ class BetterPlayerController {
         await videoPlayerController?.setNetworkDataSource(
           betterPlayerDataSource.url,
           headers: _getHeaders(),
-          useCache:
-              _betterPlayerDataSource!.cacheConfiguration?.useCache ?? false,
-          maxCacheSize:
-              _betterPlayerDataSource!.cacheConfiguration?.maxCacheSize ?? 0,
-          maxCacheFileSize:
-              _betterPlayerDataSource!.cacheConfiguration?.maxCacheFileSize ??
-                  0,
+          useCache: _betterPlayerDataSource!.cacheConfiguration?.useCache ?? false,
+          maxCacheSize: _betterPlayerDataSource!.cacheConfiguration?.maxCacheSize ?? 0,
+          maxCacheFileSize: _betterPlayerDataSource!.cacheConfiguration?.maxCacheFileSize ?? 0,
           cacheKey: _betterPlayerDataSource?.cacheConfiguration?.key,
-          showNotification: _betterPlayerDataSource
-              ?.notificationConfiguration?.showNotification,
+          showNotification: _betterPlayerDataSource?.notificationConfiguration?.showNotification,
+          id: _betterPlayerDataSource?.notificationConfiguration?.id,
+          album: _betterPlayerDataSource?.notificationConfiguration?.album,
           title: _betterPlayerDataSource?.notificationConfiguration?.title,
-          author: _betterPlayerDataSource?.notificationConfiguration?.author,
-          imageUrl:
-              _betterPlayerDataSource?.notificationConfiguration?.imageUrl,
-          notificationChannelName: _betterPlayerDataSource
-              ?.notificationConfiguration?.notificationChannelName,
+          artist: _betterPlayerDataSource?.notificationConfiguration?.artist,
+          genre: _betterPlayerDataSource?.notificationConfiguration?.genre,
+          duration: _betterPlayerDataSource?.notificationConfiguration?.duration,
+          imageUrl: _betterPlayerDataSource?.notificationConfiguration?.imageUrl,
+          displayTitle: _betterPlayerDataSource?.notificationConfiguration?.displayTitle,
+          displaySubtitle: _betterPlayerDataSource?.notificationConfiguration?.displaySubtitle,
+          displayDescription: _betterPlayerDataSource?.notificationConfiguration?.displayDescription,
+          notificationChannelName: _betterPlayerDataSource?.notificationConfiguration?.notificationChannelName,
           overriddenDuration: _betterPlayerDataSource!.overriddenDuration,
           formatHint: _getVideoFormat(_betterPlayerDataSource!.videoFormat),
           licenseUrl: _betterPlayerDataSource?.drmConfiguration?.licenseUrl,
           drmHeaders: _betterPlayerDataSource?.drmConfiguration?.headers,
-          activityName:
-              _betterPlayerDataSource?.notificationConfiguration?.activityName,
+          activityName: _betterPlayerDataSource?.notificationConfiguration?.activityName,
         );
 
         break;
@@ -470,18 +469,22 @@ class BetterPlayerController {
         }
 
         await videoPlayerController?.setFileDataSource(
-            File(betterPlayerDataSource.url),
-            showNotification: _betterPlayerDataSource
-                ?.notificationConfiguration?.showNotification,
-            title: _betterPlayerDataSource?.notificationConfiguration?.title,
-            author: _betterPlayerDataSource?.notificationConfiguration?.author,
-            imageUrl:
-                _betterPlayerDataSource?.notificationConfiguration?.imageUrl,
-            notificationChannelName: _betterPlayerDataSource
-                ?.notificationConfiguration?.notificationChannelName,
-            overriddenDuration: _betterPlayerDataSource!.overriddenDuration,
-            activityName: _betterPlayerDataSource
-                ?.notificationConfiguration?.activityName);
+          File(betterPlayerDataSource.url),
+          showNotification: _betterPlayerDataSource?.notificationConfiguration?.showNotification,
+          id: _betterPlayerDataSource?.notificationConfiguration?.id,
+          album: _betterPlayerDataSource?.notificationConfiguration?.album,
+          title: _betterPlayerDataSource?.notificationConfiguration?.title,
+          artist: _betterPlayerDataSource?.notificationConfiguration?.artist,
+          genre: _betterPlayerDataSource?.notificationConfiguration?.genre,
+          duration: _betterPlayerDataSource?.notificationConfiguration?.duration,
+          imageUrl: _betterPlayerDataSource?.notificationConfiguration?.imageUrl,
+          displayTitle: _betterPlayerDataSource?.notificationConfiguration?.displayTitle,
+          displaySubtitle: _betterPlayerDataSource?.notificationConfiguration?.displaySubtitle,
+          displayDescription: _betterPlayerDataSource?.notificationConfiguration?.displayDescription,
+          notificationChannelName: _betterPlayerDataSource?.notificationConfiguration?.notificationChannelName,
+          overriddenDuration: _betterPlayerDataSource!.overriddenDuration,
+          activityName: _betterPlayerDataSource?.notificationConfiguration?.activityName,
+        );
         break;
       case BetterPlayerDataSourceType.memory:
         final file = await _createFile(_betterPlayerDataSource!.bytes!,
@@ -489,18 +492,21 @@ class BetterPlayerController {
 
         if (file.existsSync()) {
           await videoPlayerController?.setFileDataSource(file,
-              showNotification: _betterPlayerDataSource
-                  ?.notificationConfiguration?.showNotification,
-              title: _betterPlayerDataSource?.notificationConfiguration?.title,
-              author:
-                  _betterPlayerDataSource?.notificationConfiguration?.author,
-              imageUrl:
-                  _betterPlayerDataSource?.notificationConfiguration?.imageUrl,
-              notificationChannelName: _betterPlayerDataSource
-                  ?.notificationConfiguration?.notificationChannelName,
-              overriddenDuration: _betterPlayerDataSource!.overriddenDuration,
-              activityName: _betterPlayerDataSource
-                  ?.notificationConfiguration?.activityName);
+            showNotification: _betterPlayerDataSource?.notificationConfiguration?.showNotification,
+            id: _betterPlayerDataSource?.notificationConfiguration?.id,
+            album: _betterPlayerDataSource?.notificationConfiguration?.album,
+            title: _betterPlayerDataSource?.notificationConfiguration?.title,
+            artist: _betterPlayerDataSource?.notificationConfiguration?.artist,
+            genre: _betterPlayerDataSource?.notificationConfiguration?.genre,
+            duration: _betterPlayerDataSource?.notificationConfiguration?.duration,
+            imageUrl: _betterPlayerDataSource?.notificationConfiguration?.imageUrl,
+            displayTitle: _betterPlayerDataSource?.notificationConfiguration?.displayTitle,
+            displaySubtitle: _betterPlayerDataSource?.notificationConfiguration?.displaySubtitle,
+            displayDescription: _betterPlayerDataSource?.notificationConfiguration?.displayDescription,
+            notificationChannelName: _betterPlayerDataSource?.notificationConfiguration?.notificationChannelName,
+            overriddenDuration: _betterPlayerDataSource!.overriddenDuration,
+            activityName: _betterPlayerDataSource?.notificationConfiguration?.activityName,
+          );
           _tempFiles.add(file);
         } else {
           throw ArgumentError("Couldn't create file from memory.");
@@ -1028,7 +1034,7 @@ class BetterPlayerController {
         _wasInFullScreenBeforePiP = _isFullScreen;
         await videoPlayerController?.enablePictureInPicture(
             left: 0, top: 0, width: 0, height: 0);
-        enterFullScreen();
+        // enterFullScreen();
         _postEvent(BetterPlayerEvent(BetterPlayerEventType.pipStart));
         return;
       }

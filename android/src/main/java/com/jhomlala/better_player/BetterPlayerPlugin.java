@@ -56,9 +56,16 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     private static final String HEIGHT_PARAMETER = "height";
     private static final String BITRATE_PARAMETER = "bitrate";
     private static final String SHOW_NOTIFICATION_PARAMETER = "showNotification";
+    private static final String ID_PARAMETER = "id";
+    private static final String ALBUM_PARAMETER = "album";
     private static final String TITLE_PARAMETER = "title";
-    private static final String AUTHOR_PARAMETER = "author";
+    private static final String ARTIST_PARAMETER = "artist";
+    private static final String GENRE_PARAMETER = "genre";
+    private static final String DURATION_PARAMETER = "duration";
     private static final String IMAGE_URL_PARAMETER = "imageUrl";
+    private static final String DISPLAY_TITLE_PARAMETER = "displayTitle";
+    private static final String DISPLAY_SUBTITLE_PARAMETER = "displaySubtitle";
+    private static final String DISPLAY_DESCRIPTION_PARAMETER = "displayDescription";
     private static final String NOTIFICATION_CHANNEL_NAME_PARAMETER = "notificationChannelName";
     private static final String OVERRIDDEN_DURATION_PARAMETER = "overriddenDuration";
     private static final String NAME_PARAMETER = "name";
@@ -404,13 +411,21 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 removeOtherNotificationListeners();
                 boolean showNotification = getParameter(dataSource, SHOW_NOTIFICATION_PARAMETER, false);
                 if (showNotification) {
-                    String title = getParameter(dataSource, TITLE_PARAMETER, "");
-                    String author = getParameter(dataSource, AUTHOR_PARAMETER, "");
-                    String imageUrl = getParameter(dataSource, IMAGE_URL_PARAMETER, "");
-                    String notificationChannelName = getParameter(dataSource, NOTIFICATION_CHANNEL_NAME_PARAMETER, null);
-                    String activityName = getParameter(dataSource, ACTIVITY_NAME_PARAMETER, "MainActivity");
-                    betterPlayer.setupPlayerNotification(flutterState.applicationContext,
-                            title, author, imageUrl, notificationChannelName, activityName);
+                    betterPlayer.setupPlayerNotification(
+                            flutterState.applicationContext,
+                            (String)dataSource.get(ID_PARAMETER),
+                            (String)dataSource.get(ALBUM_PARAMETER),
+                            (String)dataSource.get(TITLE_PARAMETER),
+                            (String)dataSource.get(ARTIST_PARAMETER),
+                            (String)dataSource.get(GENRE_PARAMETER),
+                            getLong(dataSource.get(DURATION_PARAMETER)),
+                            (String)dataSource.get(IMAGE_URL_PARAMETER),
+                            (String)dataSource.get(DISPLAY_TITLE_PARAMETER),
+                            (String)dataSource.get(DISPLAY_SUBTITLE_PARAMETER),
+                            (String)dataSource.get(DISPLAY_DESCRIPTION_PARAMETER),
+                            getParameter(dataSource, NOTIFICATION_CHANNEL_NAME_PARAMETER, null),
+                            getParameter(dataSource, ACTIVITY_NAME_PARAMETER, "MainActivity")
+                            );
                 }
             }
         } catch (Exception exception) {
@@ -543,5 +558,9 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
         void stopListening() {
             methodChannel.setMethodCallHandler(null);
         }
+    }
+
+    private static Long getLong(Object o) {
+        return (o == null || o instanceof Long) ? (Long)o : Long.valueOf((Integer) o);
     }
 }

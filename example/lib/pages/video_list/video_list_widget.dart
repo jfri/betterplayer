@@ -51,7 +51,7 @@ class _VideoListWidgetState extends State<VideoListWidget> {
                       BetterPlayerNotificationConfiguration(
                           showNotification: true,
                           title: videoListData!.videoTitle,
-                          author: "Test"),
+                          artist: "Test"),
                 ),
                 configuration: BetterPlayerConfiguration(
                   autoPlay: false,

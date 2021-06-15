@@ -31,7 +31,7 @@ class _NotificationPlayerPageState extends State<NotificationPlayerPage> {
       notificationConfiguration: BetterPlayerNotificationConfiguration(
         showNotification: true,
         title: "Elephant dream",
-        author: "Some author",
+        artist: "Some artist",
         imageUrl: Constants.catImageUrl,
       ),
     );

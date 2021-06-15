@@ -894,7 +894,7 @@ BetterPlayerDataSource dataSource = BetterPlayerDataSource(
       notificationConfiguration: BetterPlayerNotificationConfiguration(
         showNotification: true,
         title: "Elephant dream",
-        author: "Some author",
+        artist: "Some arist",
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/African_Bush_Elephant.jpg/1200px-African_Bush_Elephant.jpg",
         activityName: "MainActivity",
       ),
@@ -903,11 +903,11 @@ BetterPlayerDataSource dataSource = BetterPlayerDataSource(
 
 There are 3 majors parameters here:
 title - name of the resource, shown in first line
-author - author of the resource, shown in second line
+artist - artist of the resource, shown in second line
 imageUrl - image of the resource (optional). Can be both link to external image or internal file
 activityName - name of activity used to open application back on notification click; used only for Activity
 
-If showNotification is set as true and no title and author is provided, then empty notification will be
+If showNotification is set as true and no title and artist is provided, then empty notification will be
 displayed.
 
 User can control the player with notification buttons (i.e. play/pause, seek). When notification feature

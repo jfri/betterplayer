@@ -14,8 +14,10 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Handler;
+import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
@@ -39,6 +41,7 @@ import com.google.android.exoplayer2.drm.DummyExoMediaDrm;
 import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
 import com.google.android.exoplayer2.drm.UnsupportedDrmException;
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector;
+import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
@@ -73,6 +76,7 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.view.TextureRegistry;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -106,6 +110,9 @@ final class BetterPlayer {
     private EventListener exoPlayerEventListener;
     private Bitmap bitmap;
     private MediaSessionCompat mediaSession;
+    private MediaSessionConnector mediaSessionConnector;
+    private MediaMetadataCompat mediaMetadata;
+    private MediaSource mediaSource;
     private DrmSessionManager drmSessionManager;
     private WorkManager workManager;
     private HashMap<UUID, Observer<WorkInfo>> workerObserverMap;
@@ -187,7 +194,7 @@ final class BetterPlayer {
             dataSourceFactory = new DefaultDataSourceFactory(context, userAgent);
         }
 
-        MediaSource mediaSource = buildMediaSource(uri, dataSourceFactory, formatHint, cacheKey, context);
+        mediaSource = buildMediaSource(uri, dataSourceFactory, formatHint, cacheKey, context);
         if (overriddenDuration != 0) {
             ClippingMediaSource clippingMediaSource = new ClippingMediaSource(mediaSource, 0, overriddenDuration * 1000);
             exoPlayer.setMediaSource(clippingMediaSource);
@@ -200,16 +207,32 @@ final class BetterPlayer {
     }
 
 
-    public void setupPlayerNotification(Context context, String title, String author,
-                                        String imageUrl, String notificationChannelName,
-                                        String activityName) {
+    public void setupPlayerNotification(Context context, String id, String album, String title, String artist,
+                                        String genre, Long duration, String imageUrl,
+                                        String displayTitle, String displaySubtitle, String displayDescription,
+                                        String notificationChannelName, String activityName) {
+        mediaMetadata = createMediaMetadata(
+                id,
+                album,
+                title,
+                artist,
+                genre,
+                duration,
+                imageUrl,
+                displayTitle,
+                displaySubtitle,
+                displayDescription
+        );
 
         PlayerNotificationManager.MediaDescriptionAdapter mediaDescriptionAdapter
                 = new PlayerNotificationManager.MediaDescriptionAdapter() {
             @NonNull
             @Override
-            public String getCurrentContentTitle(@NonNull Player player) {
-                return title;
+            public CharSequence getCurrentContentTitle(@NonNull Player player) {
+                if (mediaMetadata == null) {
+                    return "";
+                }
+                return mediaMetadata.getDescription().getTitle();
             }
 
             @Nullable
@@ -228,67 +251,23 @@ final class BetterPlayer {
 
             @Nullable
             @Override
-            public String getCurrentContentText(@NonNull Player player) {
-                return author;
+            public CharSequence getCurrentContentText(@NonNull Player player) {
+                if (mediaMetadata == null) {
+                    return "";
+                }
+                return mediaMetadata.getDescription().getSubtitle();
             }
 
             @Nullable
             @Override
             public Bitmap getCurrentLargeIcon(@NonNull Player player,
                                               @NonNull PlayerNotificationManager.BitmapCallback callback) {
-                if (imageUrl == null) {
-                    return null;
-                }
-                if (bitmap != null) {
-                    return bitmap;
-                }
-
-
-                OneTimeWorkRequest imageWorkRequest = new OneTimeWorkRequest.Builder(ImageWorker.class)
-                        .addTag(imageUrl)
-                        .setInputData(
-                                new Data.Builder()
-                                        .putString(BetterPlayerPlugin.URL_PARAMETER, imageUrl)
-                                        .build())
-                        .build();
-
-                workManager.enqueue(imageWorkRequest);
-
-                Observer<WorkInfo> workInfoObserver = workInfo -> {
-                    try {
-                        if (workInfo != null) {
-                            WorkInfo.State state = workInfo.getState();
-                            if (state == WorkInfo.State.SUCCEEDED) {
-
-                                Data outputData = workInfo.getOutputData();
-                                String filePath = outputData.getString(BetterPlayerPlugin.FILE_PATH_PARAMETER);
-                                //Bitmap here is already processed and it's very small, so it won't
-                                //break anything.
-                                bitmap = BitmapFactory.decodeFile(filePath);
-                                callback.onBitmap(bitmap);
-
-                            }
-                            if (state == WorkInfo.State.SUCCEEDED
-                                    || state == WorkInfo.State.CANCELLED
-                                    || state == WorkInfo.State.FAILED) {
-                                final UUID uuid = imageWorkRequest.getId();
-                                Observer<WorkInfo> observer = workerObserverMap.remove(uuid);
-                                if (observer != null) {
-                                    workManager.getWorkInfoByIdLiveData(uuid).removeObserver(observer);
-                                }
-                            }
-                        }
-
-
-                    } catch (Exception exception) {
-                        Log.e(TAG, "Image select error: " + exception);
+                if (mediaMetadata != null) {
+                    Uri artworkUri = mediaMetadata.getDescription().getIconUri();
+                    if (artworkUri != null) {
+                        new DownloadImageTask(callback).execute(artworkUri.toString());
                     }
-                };
-
-                final UUID workerUuid = imageWorkRequest.getId();
-                workManager.getWorkInfoByIdLiveData(workerUuid)
-                        .observeForever(workInfoObserver);
-                workerObserverMap.put(workerUuid, workInfoObserver);
+                }
 
                 return null;
             }
@@ -307,55 +286,56 @@ final class BetterPlayer {
             }
         }
 
-
         playerNotificationManager = new PlayerNotificationManager(context,
                 playerNotificationChannelName,
                 NOTIFICATION_ID,
                 mediaDescriptionAdapter);
-        playerNotificationManager.setPlayer(exoPlayer);
-        playerNotificationManager.setUseNextAction(false);
-        playerNotificationManager.setUsePreviousAction(false);
-        playerNotificationManager.setUseStopAction(false);
+        playerNotificationManager.setPlayer(mediaMetadata == null ? null : exoPlayer);
+        playerNotificationManager.setUseStopAction(true);
+        playerNotificationManager.setFastForwardIncrementMs(10000);
+        playerNotificationManager.setRewindIncrementMs(10000);
 
 
-        MediaSessionCompat mediaSession = setupMediaSession(context, false);
-        playerNotificationManager.setMediaSessionToken(mediaSession.getSessionToken());
+        mediaSession = setupMediaSession(context, false);
+        playerNotificationManager.setMediaSessionToken(mediaMetadata == null ? null : mediaSession.getSessionToken());
 
 
         playerNotificationManager.setControlDispatcher(setupControlDispatcher());
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            refreshHandler = new Handler();
-            refreshRunnable = () -> {
-                PlaybackStateCompat playbackState;
-                if (exoPlayer.getPlayWhenReady()) {
-                    playbackState = new PlaybackStateCompat.Builder()
-                            .setActions(PlaybackStateCompat.ACTION_SEEK_TO)
-                            .setState(PlaybackStateCompat.STATE_PAUSED, getPosition(), 1.0f)
-                            .build();
-                } else {
-                    playbackState = new PlaybackStateCompat.Builder()
-                            .setActions(PlaybackStateCompat.ACTION_SEEK_TO)
-                            .setState(PlaybackStateCompat.STATE_PLAYING, getPosition(), 1.0f)
-                            .build();
-                }
-
-                mediaSession.setPlaybackState(playbackState);
-                refreshHandler.postDelayed(refreshRunnable, 1000);
-            };
-            refreshHandler.postDelayed(refreshRunnable, 0);
+//            refreshHandler = new Handler();
+//            refreshRunnable = () -> {
+//                PlaybackStateCompat playbackState;
+//                if (exoPlayer.getPlayWhenReady()) {
+//                    playbackState = new PlaybackStateCompat.Builder()
+//                            .setActions(PlaybackStateCompat.ACTION_SEEK_TO)
+//                            .setState(PlaybackStateCompat.STATE_PAUSED, getPosition(), 1.0f)
+//                            .build();
+//                } else {
+//                    playbackState = new PlaybackStateCompat.Builder()
+//                            .setActions(PlaybackStateCompat.ACTION_SEEK_TO)
+//                            .setState(PlaybackStateCompat.STATE_PLAYING, getPosition(), 1.0f)
+//                            .build();
+//                }
+//
+//                mediaSession.setPlaybackState(playbackState);
+//                refreshHandler.postDelayed(refreshRunnable, 1000);
+//            };
+//            refreshHandler.postDelayed(refreshRunnable, 0);
         }
 
         exoPlayerEventListener = new EventListener() {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
-                mediaSession.setMetadata(new MediaMetadataCompat.Builder()
-                        .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, getDuration())
-                        .build());
+//                mediaSession.setMetadata(new MediaMetadataCompat.Builder()
+//                        .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, getDuration())
+//                        .build());
             }
         };
 
         exoPlayer.addListener(exoPlayerEventListener);
         exoPlayer.seekTo(0);
+
+        mediaSessionConnector.invalidateMediaSessionMetadata();
     }
 
 
@@ -599,6 +579,15 @@ final class BetterPlayer {
     }
 
     void play() {
+        if (mediaSession != null) {
+            mediaSession.setActive(true);
+        }
+
+        if (exoPlayer.getPlaybackState() == Player.STATE_IDLE && mediaSource != null) {
+            // the player was likely stopped from the notification, so we need to re-prepare it before it'll plays
+            exoPlayer.prepare(mediaSource);
+        }
+
         exoPlayer.setPlayWhenReady(true);
     }
 
@@ -706,12 +695,29 @@ final class BetterPlayer {
         });
 
         mediaSession.setActive(true);
-        MediaSessionConnector mediaSessionConnector =
-                new MediaSessionConnector(mediaSession);
+        mediaSessionConnector = new MediaSessionConnector(mediaSession);
         if (setupControlDispatcher) {
             mediaSessionConnector.setControlDispatcher(setupControlDispatcher());
         }
         mediaSessionConnector.setPlayer(exoPlayer);
+        mediaSessionConnector.setQueueNavigator(new TimelineQueueNavigator(mediaSession) {
+            @Override
+            public MediaDescriptionCompat getMediaDescription(Player player, int windowIndex) {
+                if (mediaMetadata == null) {
+                    return new MediaDescriptionCompat.Builder().build();
+                }
+                return mediaMetadata.getDescription();
+            }
+        });
+        mediaSessionConnector.setEnabledPlaybackActions(
+                  PlaybackStateCompat.ACTION_PLAY_PAUSE
+                          | PlaybackStateCompat.ACTION_PLAY
+                          | PlaybackStateCompat.ACTION_PAUSE
+                          | PlaybackStateCompat.ACTION_SEEK_TO
+                          | PlaybackStateCompat.ACTION_FAST_FORWARD
+                          | PlaybackStateCompat.ACTION_REWIND
+                          | PlaybackStateCompat.ACTION_STOP
+        );
 
         Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
         mediaButtonIntent.setClass(context, MediaButtonReceiver.class);
@@ -731,6 +737,7 @@ final class BetterPlayer {
 
     public void disposeMediaSession() {
         if (mediaSession != null) {
+            mediaSession.setActive(false);
             mediaSession.release();
         }
         mediaSession = null;
@@ -912,6 +919,48 @@ final class BetterPlayer {
         return result;
     }
 
+    private MediaMetadataCompat createMediaMetadata(String mediaId, String album, String title, String artist, String genre, Long duration, String artUri, String displayTitle, String displaySubtitle, String displayDescription) {
+        MediaMetadataCompat.Builder builder = new MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, mediaId)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album)
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title);
+        if (artist != null)
+            builder.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist);
+        if (genre != null)
+            builder.putString(MediaMetadataCompat.METADATA_KEY_GENRE, genre);
+        if (duration != null)
+            builder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration);
+        if (artUri != null) {
+            builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, artUri);
+        }
+        if (displayTitle != null)
+            builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title);
+        if (displaySubtitle != null)
+            builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, displaySubtitle);
+        if (displayDescription != null)
+            builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, displayDescription);
+        return builder.build();
+    }
+
+    private static class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
+        PlayerNotificationManager.BitmapCallback callback;
+        DownloadImageTask(PlayerNotificationManager.BitmapCallback callback) {
+            this.callback = callback;
+        }
+
+        protected Bitmap doInBackground(String... urls) {
+            String url = urls[0];
+            Bitmap bmp = null;
+            try {
+                InputStream in = new java.net.URL(url).openStream();
+                bmp = BitmapFactory.decodeStream(in);
+            } catch (Exception ignored) {}
+            return bmp;
+        }
+        protected void onPostExecute(Bitmap result) {
+            callback.onBitmap(result);
+        }
+    }
 }
 
 
