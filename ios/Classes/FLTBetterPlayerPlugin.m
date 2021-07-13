@@ -712,6 +712,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
         if (!_pipController && self._playerLayer && [AVPictureInPictureController isPictureInPictureSupported]) {
             _pipController = [[AVPictureInPictureController alloc] initWithPlayerLayer:self._playerLayer];
+            _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
             _pipController.delegate = self;
         }
     } else {
@@ -907,7 +908,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     [self disposeSansEventChannel];
     [_eventChannel setStreamHandler:nil];
     [self disablePictureInPicture];
-    [self setPictureInPicture:false];
+    [self setPictureInPicture:NO];
     [self._playerLayer removeFromSuperlayer];
     self._playerLayer = nil;
     _disposed = true;
@@ -1310,7 +1311,7 @@ NSMutableDictionary*  _artworkImageDict;
             result([NSNumber numberWithBool:false]);
         } else if ([@"disablePictureInPicture" isEqualToString:call.method]){
             [player disablePictureInPicture];
-            [player setPictureInPicture:false];
+            [player setPictureInPicture:NO];
         } else if ([@"setAudioTrack" isEqualToString:call.method]){
             NSString* name = argsMap[@"name"];
             int index = [argsMap[@"index"] intValue];

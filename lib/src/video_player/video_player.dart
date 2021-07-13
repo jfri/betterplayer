@@ -634,6 +634,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     return _videoPlayerPlatform.isPictureInPictureEnabled(_textureId);
   }
 
+  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(bool shouldCall) async {
+    return _videoPlayerPlatform.setCallActivityEnterPictureInPictureModeOnUserLeaveHint(shouldCall);
+  }
+
   void refresh() {
     value = value.copyWith();
   }

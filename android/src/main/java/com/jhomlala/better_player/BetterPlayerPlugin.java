@@ -25,6 +25,7 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.view.TextureRegistry;
 
 import java.util.HashMap;
@@ -33,7 +34,7 @@ import java.util.Map;
 /**
  * Android platform implementation of the VideoPlayerPlugin.
  */
-public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodCallHandler {
+public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.UserLeaveHintListener {
     private static final String TAG = "BetterPlayerPlugin";
     private static final String CHANNEL = "better_player_channel";
     private static final String EVENTS_CHANNEL = "better_player_channel/videoEvents";
@@ -81,6 +82,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     public static final String FILE_PATH_PARAMETER = "filePath";
     public static final String ACTIVITY_NAME_PARAMETER = "activityName";
     public static final String CACHE_KEY_PARAMETER = "cacheKey";
+    public static final String SHOULD_CALL_PARAMETER = "shouldCall";
 
 
     private static final String INIT_METHOD = "init";
@@ -104,6 +106,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     private static final String DISPOSE_METHOD = "dispose";
     private static final String PRE_CACHE_METHOD = "preCache";
     private static final String STOP_PRE_CACHE_METHOD = "stopPreCache";
+    private static final String SET_CALL_ACTIVITY_ENTER_PICTURE_IN_PICTURE_MODE_ON_USER_LEAVE_HINT_METHOD = "setCallActivityEnterPictureInPictureModeOnUserLeaveHint";
 
     private final LongSparseArray<BetterPlayer> videoPlayers = new LongSparseArray<>();
     private final LongSparseArray<Map<String, Object>> dataSources = new LongSparseArray<>();
@@ -111,8 +114,10 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     private long currentNotificationTextureId = -1;
     private Map<String, Object> currentNotificationDataSource;
     private Activity activity;
+    private ActivityPluginBinding activityPluginBinding;
     private Handler pipHandler;
     private Runnable pipRunnable;
+    private boolean callActivityEnterPictureInPictureModeOnUserLeaveHint;
 
     @Override
     public void onAttachedToEngine(FlutterPluginBinding binding) {
@@ -181,6 +186,10 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 break;
             case CLEAR_CACHE_METHOD:
                 clearCache(result);
+                break;
+            case SET_CALL_ACTIVITY_ENTER_PICTURE_IN_PICTURE_MODE_ON_USER_LEAVE_HINT_METHOD:
+                setCallActivityEnterPictureInPictureModeOnUserLeaveHint(call.argument(SHOULD_CALL_PARAMETER));
+                result.success(null);
                 break;
             default: {
                 long textureId = ((Number) call.argument(TEXTURE_ID_PARAMETER)).longValue();
@@ -452,19 +461,33 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
 
     @Override
     public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
+        binding.addOnUserLeaveHintListener(this);
+        activityPluginBinding = binding;
         activity = binding.getActivity();
     }
 
     @Override
     public void onDetachedFromActivityForConfigChanges() {
+        activityPluginBinding.removeOnUserLeaveHintListener(this);
     }
 
     @Override
     public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
+        binding.addOnUserLeaveHintListener(this);
+        activityPluginBinding = binding;
+        activity = binding.getActivity();
     }
 
     @Override
     public void onDetachedFromActivity() {
+        activityPluginBinding.removeOnUserLeaveHintListener(this);
+    }
+
+    @Override
+    public void onUserLeaveHint() {
+        if (callActivityEnterPictureInPictureModeOnUserLeaveHint && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            activity.enterPictureInPictureMode(new PictureInPictureParams.Builder().build());
+        }
     }
 
     private boolean isPictureInPictureSupported() {
@@ -474,10 +497,16 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 .hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE);
     }
 
+    private void setCallActivityEnterPictureInPictureModeOnUserLeaveHint(boolean shouldCall) {
+        callActivityEnterPictureInPictureModeOnUserLeaveHint = shouldCall;
+    }
+
     private void enablePictureInPicture(BetterPlayer player) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             player.setupMediaSession(flutterState.applicationContext, true);
-            activity.enterPictureInPictureMode(new PictureInPictureParams.Builder().build());
+            if (!activity.isInPictureInPictureMode()) {
+                activity.enterPictureInPictureMode(new PictureInPictureParams.Builder().build());
+            }
             startPictureInPictureListenerTimer(player);
             player.onPictureInPictureStatusChanged(true);
         }

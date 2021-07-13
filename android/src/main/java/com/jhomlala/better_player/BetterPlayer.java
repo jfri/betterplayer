@@ -27,6 +27,7 @@ import android.view.Surface;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ControlDispatcher;
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Player;
@@ -564,7 +565,7 @@ final class BetterPlayer {
     }
 
     private void setAudioAttributes(SimpleExoPlayer exoPlayer, Boolean mixWithOthers) {
-        Player.AudioComponent audioComponent = exoPlayer.getAudioComponent();
+        ExoPlayer.AudioComponent audioComponent = exoPlayer.getAudioComponent();
         if (audioComponent == null) {
             return;
         }

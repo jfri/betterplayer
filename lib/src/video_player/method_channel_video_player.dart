@@ -242,6 +242,16 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
+  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(bool shouldCall) async {
+    return _channel.invokeMethod<void>(
+      'setCallActivityEnterPictureInPictureModeOnUserLeaveHint',
+      <String, dynamic>{
+        'shouldCall': shouldCall,
+      },
+    );
+  }
+
+  @override
   Future<bool?> isPictureInPictureEnabled(int? textureId) {
     return _channel.invokeMethod<bool>(
       'isPictureInPictureSupported',
