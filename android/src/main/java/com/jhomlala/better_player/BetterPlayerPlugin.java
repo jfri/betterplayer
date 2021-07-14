@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 import android.util.LongSparseArray;
+import android.util.Rational;
 
 import androidx.annotation.NonNull;
 
@@ -83,6 +84,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     public static final String ACTIVITY_NAME_PARAMETER = "activityName";
     public static final String CACHE_KEY_PARAMETER = "cacheKey";
     public static final String SHOULD_CALL_PARAMETER = "shouldCall";
+    private static final String ASPECT_RATIO_PARAMETER = "aspectRatio";
 
 
     private static final String INIT_METHOD = "init";
@@ -117,7 +119,8 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     private ActivityPluginBinding activityPluginBinding;
     private Handler pipHandler;
     private Runnable pipRunnable;
-    private boolean callActivityEnterPictureInPictureModeOnUserLeaveHint;
+    private BetterPlayer callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer;
+    private Rational pictureInPictureAspectRatio;
 
     @Override
     public void onAttachedToEngine(FlutterPluginBinding binding) {
@@ -187,10 +190,6 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
             case CLEAR_CACHE_METHOD:
                 clearCache(result);
                 break;
-            case SET_CALL_ACTIVITY_ENTER_PICTURE_IN_PICTURE_MODE_ON_USER_LEAVE_HINT_METHOD:
-                setCallActivityEnterPictureInPictureModeOnUserLeaveHint(call.argument(SHOULD_CALL_PARAMETER));
-                result.success(null);
-                break;
             default: {
                 long textureId = ((Number) call.argument(TEXTURE_ID_PARAMETER)).longValue();
                 BetterPlayer player = videoPlayers.get(textureId);
@@ -255,6 +254,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 result.success(null);
                 break;
             case ENABLE_PICTURE_IN_PICTURE_METHOD:
+                pictureInPictureAspectRatio = new Rational(call.<Double>argument(WIDTH_PARAMETER).intValue(), call.<Double>argument(HEIGHT_PARAMETER).intValue());
                 enablePictureInPicture(player);
                 result.success(null);
                 break;
@@ -274,6 +274,11 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 break;
             case SET_MIX_WITH_OTHERS_METHOD:
                 player.setMixWithOthers(call.argument(MIX_WITH_OTHERS_PARAMETER));
+                break;
+            case SET_CALL_ACTIVITY_ENTER_PICTURE_IN_PICTURE_MODE_ON_USER_LEAVE_HINT_METHOD:
+                pictureInPictureAspectRatio = new Rational(call.argument(WIDTH_PARAMETER), call.argument(HEIGHT_PARAMETER));
+                setCallActivityEnterPictureInPictureModeOnUserLeaveHint(player, call.argument(SHOULD_CALL_PARAMETER));
+                result.success(null);
                 break;
             case DISPOSE_METHOD:
                 dispose(player, textureId);
@@ -422,19 +427,19 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 if (showNotification) {
                     betterPlayer.setupPlayerNotification(
                             flutterState.applicationContext,
-                            (String)dataSource.get(ID_PARAMETER),
-                            (String)dataSource.get(ALBUM_PARAMETER),
-                            (String)dataSource.get(TITLE_PARAMETER),
-                            (String)dataSource.get(ARTIST_PARAMETER),
-                            (String)dataSource.get(GENRE_PARAMETER),
+                            (String) dataSource.get(ID_PARAMETER),
+                            (String) dataSource.get(ALBUM_PARAMETER),
+                            (String) dataSource.get(TITLE_PARAMETER),
+                            (String) dataSource.get(ARTIST_PARAMETER),
+                            (String) dataSource.get(GENRE_PARAMETER),
                             getLong(dataSource.get(DURATION_PARAMETER)),
-                            (String)dataSource.get(IMAGE_URL_PARAMETER),
-                            (String)dataSource.get(DISPLAY_TITLE_PARAMETER),
-                            (String)dataSource.get(DISPLAY_SUBTITLE_PARAMETER),
-                            (String)dataSource.get(DISPLAY_DESCRIPTION_PARAMETER),
+                            (String) dataSource.get(IMAGE_URL_PARAMETER),
+                            (String) dataSource.get(DISPLAY_TITLE_PARAMETER),
+                            (String) dataSource.get(DISPLAY_SUBTITLE_PARAMETER),
+                            (String) dataSource.get(DISPLAY_DESCRIPTION_PARAMETER),
                             getParameter(dataSource, NOTIFICATION_CHANNEL_NAME_PARAMETER, null),
                             getParameter(dataSource, ACTIVITY_NAME_PARAMETER, "MainActivity")
-                            );
+                    );
                 }
             }
         } catch (Exception exception) {
@@ -485,8 +490,8 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
 
     @Override
     public void onUserLeaveHint() {
-        if (callActivityEnterPictureInPictureModeOnUserLeaveHint && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            activity.enterPictureInPictureMode(new PictureInPictureParams.Builder().build());
+        if (isPictureInPictureSupported() && callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            enablePictureInPicture(callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer);
         }
     }
 
@@ -497,17 +502,24 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 .hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE);
     }
 
-    private void setCallActivityEnterPictureInPictureModeOnUserLeaveHint(boolean shouldCall) {
-        callActivityEnterPictureInPictureModeOnUserLeaveHint = shouldCall;
+    private void setCallActivityEnterPictureInPictureModeOnUserLeaveHint(BetterPlayer player, boolean shouldCall) {
+        callActivityEnterPictureInPictureModeOnUserLeaveHintForPlayer = shouldCall ? player : null;
     }
 
     private void enablePictureInPicture(BetterPlayer player) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            player.setupMediaSession(flutterState.applicationContext, true);
             if (!activity.isInPictureInPictureMode()) {
-                activity.enterPictureInPictureMode(new PictureInPictureParams.Builder().build());
+                player.setupMediaSession(flutterState.applicationContext, true);
+                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+
+                if (pictureInPictureAspectRatio != null) {
+                    builder.setAspectRatio(pictureInPictureAspectRatio);
+                }
+
+                activity.enterPictureInPictureMode(builder.build());
+                startPictureInPictureListenerTimer(player);
             }
-            startPictureInPictureListenerTimer(player);
+
             player.onPictureInPictureStatusChanged(true);
         }
     }
@@ -590,6 +602,6 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     }
 
     private static Long getLong(Object o) {
-        return (o == null || o instanceof Long) ? (Long)o : Long.valueOf((Integer) o);
+        return (o == null || o instanceof Long) ? (Long) o : Long.valueOf((Integer) o);
     }
 }

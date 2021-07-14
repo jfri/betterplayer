@@ -242,11 +242,14 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
-  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(bool shouldCall) async {
+  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(int? textureId, bool shouldCall, int width, int height) async {
     return _channel.invokeMethod<void>(
       'setCallActivityEnterPictureInPictureModeOnUserLeaveHint',
       <String, dynamic>{
+        'textureId': textureId,
         'shouldCall': shouldCall,
+        'width': width,
+        'height': height,
       },
     );
   }
@@ -401,6 +404,12 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
         case 'pause':
           return VideoEvent(
             eventType: VideoEventType.pause,
+            key: key,
+          );
+
+        case 'stop':
+          return VideoEvent(
+            eventType: VideoEventType.stop,
             key: key,
           );
 

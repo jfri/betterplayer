@@ -155,12 +155,6 @@ class BetterPlayerController {
   ///Was Picture in Picture opened.
   bool _wasInPipMode = false;
 
-  ///Was player in fullscreen before Picture in Picture opened.
-  bool _wasInFullScreenBeforePiP = false;
-
-  ///Was controls enabled before Picture in Picture opened.
-  bool _wasControlsEnabledBeforePiP = false;
-
   ///GlobalKey of the BetterPlayer widget
   GlobalKey? _betterPlayerGlobalKey;
 
@@ -770,12 +764,6 @@ class BetterPlayerController {
     } else if (_wasInPipMode) {
       _postEvent(BetterPlayerEvent(BetterPlayerEventType.pipStop));
       _wasInPipMode = false;
-      if (!_wasInFullScreenBeforePiP) {
-        exitFullScreen();
-      }
-      if (_wasControlsEnabledBeforePiP) {
-        setControlsEnabled(true);
-      }
       videoPlayerController?.refresh();
     }
 
@@ -1027,18 +1015,8 @@ class BetterPlayerController {
         (await videoPlayerController!.isPictureInPictureSupported()) ?? false;
 
     if (isPipSupported) {
-      _wasInFullScreenBeforePiP = _isFullScreen;
-      _wasControlsEnabledBeforePiP = _controlsEnabled;
       setControlsEnabled(false);
-      if (Platform.isAndroid) {
-        _wasInFullScreenBeforePiP = _isFullScreen;
-        await videoPlayerController?.enablePictureInPicture(
-            left: 0, top: 0, width: 0, height: 0);
-        enterFullScreen();
-        _postEvent(BetterPlayerEvent(BetterPlayerEventType.pipStart));
-        return;
-      }
-      if (Platform.isIOS) {
+      if (Platform.isAndroid || Platform.isIOS) {
         final RenderBox? renderBox = betterPlayerGlobalKey.currentContext!
             .findRenderObject() as RenderBox?;
         if (renderBox == null) {

@@ -158,7 +158,7 @@ abstract class VideoPlayerPlatform {
         'isPictureInPictureEnabled() has not been implemented.');
   }
 
-  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(bool shouldCall) {
+  Future<void> setCallActivityEnterPictureInPictureModeOnUserLeaveHint(int? textureId, bool shouldCall, int width, int height) {
     throw UnimplementedError(
         'setCallActivityEnterPictureInPictureModeOnUserLeaveHint() has not been implemented.');
   }
@@ -482,6 +482,9 @@ enum VideoEventType {
 
   /// The video is set to pause
   pause,
+
+  /// The video is set to stop
+  stop,
 
   /// The video is set to given to position
   seek,

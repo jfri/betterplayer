@@ -292,12 +292,12 @@ final class BetterPlayer {
                 NOTIFICATION_ID,
                 mediaDescriptionAdapter);
         playerNotificationManager.setPlayer(mediaMetadata == null ? null : exoPlayer);
+        playerNotificationManager.setUseNextAction(false);
+        playerNotificationManager.setUsePreviousAction(false);
         playerNotificationManager.setUseStopAction(true);
-        playerNotificationManager.setFastForwardIncrementMs(10000);
-        playerNotificationManager.setRewindIncrementMs(10000);
 
 
-        mediaSession = setupMediaSession(context, false);
+        setupMediaSession(context, false);
         playerNotificationManager.setMediaSessionToken(mediaMetadata == null ? null : mediaSession.getSessionToken());
 
 
@@ -397,7 +397,8 @@ final class BetterPlayer {
 
             @Override
             public boolean dispatchStop(Player player, boolean reset) {
-                return false;
+                sendEvent("stop");
+                return true;
             }
 
             @Override
@@ -407,12 +408,12 @@ final class BetterPlayer {
 
             @Override
             public boolean isRewindEnabled() {
-                return true;
+                return false;
             }
 
             @Override
             public boolean isFastForwardEnabled() {
-                return true;
+                return false;
             }
         };
     }
@@ -701,24 +702,6 @@ final class BetterPlayer {
             mediaSessionConnector.setControlDispatcher(setupControlDispatcher());
         }
         mediaSessionConnector.setPlayer(exoPlayer);
-        mediaSessionConnector.setQueueNavigator(new TimelineQueueNavigator(mediaSession) {
-            @Override
-            public MediaDescriptionCompat getMediaDescription(Player player, int windowIndex) {
-                if (mediaMetadata == null) {
-                    return new MediaDescriptionCompat.Builder().build();
-                }
-                return mediaMetadata.getDescription();
-            }
-        });
-        mediaSessionConnector.setEnabledPlaybackActions(
-                  PlaybackStateCompat.ACTION_PLAY_PAUSE
-                          | PlaybackStateCompat.ACTION_PLAY
-                          | PlaybackStateCompat.ACTION_PAUSE
-                          | PlaybackStateCompat.ACTION_SEEK_TO
-                          | PlaybackStateCompat.ACTION_FAST_FORWARD
-                          | PlaybackStateCompat.ACTION_REWIND
-                          | PlaybackStateCompat.ACTION_STOP
-        );
 
         Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
         mediaButtonIntent.setClass(context, MediaButtonReceiver.class);
