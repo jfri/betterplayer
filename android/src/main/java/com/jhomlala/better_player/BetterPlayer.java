@@ -287,53 +287,17 @@ final class BetterPlayer {
             }
         }
 
-        playerNotificationManager = new PlayerNotificationManager(context,
-                playerNotificationChannelName,
+        playerNotificationManager = new PlayerNotificationManager.Builder(context,
                 NOTIFICATION_ID,
-                mediaDescriptionAdapter);
+                playerNotificationChannelName,
+                mediaDescriptionAdapter).build();
         playerNotificationManager.setPlayer(mediaMetadata == null ? null : exoPlayer);
         playerNotificationManager.setUseNextAction(false);
         playerNotificationManager.setUsePreviousAction(false);
         playerNotificationManager.setUseStopAction(true);
-
-
-        setupMediaSession(context, false);
+        setupMediaSession(context);
         playerNotificationManager.setMediaSessionToken(mediaMetadata == null ? null : mediaSession.getSessionToken());
-
-
         playerNotificationManager.setControlDispatcher(setupControlDispatcher());
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-//            refreshHandler = new Handler();
-//            refreshRunnable = () -> {
-//                PlaybackStateCompat playbackState;
-//                if (exoPlayer.getPlayWhenReady()) {
-//                    playbackState = new PlaybackStateCompat.Builder()
-//                            .setActions(PlaybackStateCompat.ACTION_SEEK_TO)
-//                            .setState(PlaybackStateCompat.STATE_PAUSED, getPosition(), 1.0f)
-//                            .build();
-//                } else {
-//                    playbackState = new PlaybackStateCompat.Builder()
-//                            .setActions(PlaybackStateCompat.ACTION_SEEK_TO)
-//                            .setState(PlaybackStateCompat.STATE_PLAYING, getPosition(), 1.0f)
-//                            .build();
-//                }
-//
-//                mediaSession.setPlaybackState(playbackState);
-//                refreshHandler.postDelayed(refreshRunnable, 1000);
-//            };
-//            refreshHandler.postDelayed(refreshRunnable, 0);
-        }
-
-        exoPlayerEventListener = new EventListener() {
-            @Override
-            public void onPlaybackStateChanged(int playbackState) {
-//                mediaSession.setMetadata(new MediaMetadataCompat.Builder()
-//                        .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, getDuration())
-//                        .build());
-            }
-        };
-
-        exoPlayer.addListener(exoPlayerEventListener);
         exoPlayer.seekTo(0);
 
         mediaSessionConnector.invalidateMediaSessionMetadata();
@@ -679,10 +643,9 @@ final class BetterPlayer {
      * Create media session which will be used in notifications, pip mode.
      *
      * @param context                - android context
-     * @param setupControlDispatcher - should add control dispatcher to created MediaSession
      * @return - configured MediaSession instance
      */
-    public MediaSessionCompat setupMediaSession(Context context, boolean setupControlDispatcher) {
+    public MediaSessionCompat setupMediaSession(Context context) {
         if (mediaSession != null) {
             mediaSession.release();
         }
@@ -698,9 +661,6 @@ final class BetterPlayer {
 
         mediaSession.setActive(true);
         mediaSessionConnector = new MediaSessionConnector(mediaSession);
-        if (setupControlDispatcher) {
-            mediaSessionConnector.setControlDispatcher(setupControlDispatcher());
-        }
         mediaSessionConnector.setPlayer(exoPlayer);
 
         Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
@@ -720,6 +680,7 @@ final class BetterPlayer {
     }
 
     public void disposeMediaSession() {
+        Log.e(TAG, "disposeMediaSession()");
         if (mediaSession != null) {
             mediaSession.setActive(false);
             mediaSession.release();
@@ -928,6 +889,7 @@ final class BetterPlayer {
 
     private static class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
         PlayerNotificationManager.BitmapCallback callback;
+
         DownloadImageTask(PlayerNotificationManager.BitmapCallback callback) {
             this.callback = callback;
         }
@@ -938,9 +900,11 @@ final class BetterPlayer {
             try {
                 InputStream in = new java.net.URL(url).openStream();
                 bmp = BitmapFactory.decodeStream(in);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             return bmp;
         }
+
         protected void onPostExecute(Bitmap result) {
             callback.onBitmap(result);
         }

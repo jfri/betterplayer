@@ -509,7 +509,6 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     private void enablePictureInPicture(BetterPlayer player) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (!activity.isInPictureInPictureMode()) {
-                player.setupMediaSession(flutterState.applicationContext, true);
                 PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
 
                 if (pictureInPictureAspectRatio != null) {
@@ -528,7 +527,6 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
         stopPipHandler();
         activity.moveTaskToBack(false);
         player.onPictureInPictureStatusChanged(false);
-        player.disposeMediaSession();
     }
 
     private void startPictureInPictureListenerTimer(BetterPlayer player) {
@@ -539,7 +537,6 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                     pipHandler.postDelayed(pipRunnable, 100);
                 } else {
                     player.onPictureInPictureStatusChanged(false);
-                    player.disposeMediaSession();
                     stopPipHandler();
                 }
             };
