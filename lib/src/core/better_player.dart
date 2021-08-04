@@ -112,10 +112,11 @@ class _BetterPlayerState extends State<BetterPlayer>
     if (_isFullScreen) {
       Wakelock.disable();
       _navigatorState.maybePop();
-      SystemChrome.setEnabledSystemUIOverlays(
-          _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
-      SystemChrome.setPreferredOrientations(
-          _betterPlayerConfiguration.deviceOrientationsAfterFullScreen);
+      SystemChrome.setEnabledSystemUIOverlays(_betterPlayerConfiguration.systemOverlaysAfterFullScreen);
+
+      if (_betterPlayerConfiguration.deviceOrientationsAfterFullScreen != null) {
+        SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen!);
+      }
     }
 
     WidgetsBinding.instance!.removeObserver(this);
@@ -246,16 +247,14 @@ class _BetterPlayerState extends State<BetterPlayer>
           ];
         }
         await SystemChrome.setPreferredOrientations(deviceOrientations);
-      } else {
+      } else if (widget.controller.betterPlayerConfiguration.deviceOrientationsOnFullScreen != null) {
         await SystemChrome.setPreferredOrientations(
-          widget.controller.betterPlayerConfiguration
-              .deviceOrientationsOnFullScreen,
+          widget.controller.betterPlayerConfiguration.deviceOrientationsOnFullScreen!,
         );
       }
-    } else {
+    } else if (widget.controller.betterPlayerConfiguration.deviceOrientationsOnFullScreen != null) {
       await SystemChrome.setPreferredOrientations(
-        widget.controller.betterPlayerConfiguration
-            .deviceOrientationsOnFullScreen,
+        widget.controller.betterPlayerConfiguration.deviceOrientationsOnFullScreen!,
       );
     }
 
@@ -271,10 +270,11 @@ class _BetterPlayerState extends State<BetterPlayer>
     // so we do not need to check Wakelock.isEnabled.
     Wakelock.disable();
 
-    await SystemChrome.setEnabledSystemUIOverlays(
-        _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
-    await SystemChrome.setPreferredOrientations(
-        _betterPlayerConfiguration.deviceOrientationsAfterFullScreen);
+    await SystemChrome.setEnabledSystemUIOverlays(_betterPlayerConfiguration.systemOverlaysAfterFullScreen);
+
+    if (_betterPlayerConfiguration.deviceOrientationsAfterFullScreen != null) {
+      await SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen!);
+    }
   }
 
   Widget _buildPlayer() {
