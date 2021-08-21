@@ -254,7 +254,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 result.success(null);
                 break;
             case ENABLE_PICTURE_IN_PICTURE_METHOD:
-                pictureInPictureAspectRatio = new Rational(call.<Double>argument(WIDTH_PARAMETER).intValue(), call.<Double>argument(HEIGHT_PARAMETER).intValue());
+                setPictureInPictureAspectRatio(call.<Double>argument(WIDTH_PARAMETER).intValue(), call.<Double>argument(HEIGHT_PARAMETER).intValue());
                 enablePictureInPicture(player);
                 result.success(null);
                 break;
@@ -276,7 +276,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 player.setMixWithOthers(call.argument(MIX_WITH_OTHERS_PARAMETER));
                 break;
             case SET_CALL_ACTIVITY_ENTER_PICTURE_IN_PICTURE_MODE_ON_USER_LEAVE_HINT_METHOD:
-                pictureInPictureAspectRatio = new Rational(call.argument(WIDTH_PARAMETER), call.argument(HEIGHT_PARAMETER));
+                setPictureInPictureAspectRatio(call.argument(WIDTH_PARAMETER), call.argument(HEIGHT_PARAMETER));
                 setCallActivityEnterPictureInPictureModeOnUserLeaveHint(player, call.argument(SHOULD_CALL_PARAMETER));
                 result.success(null);
                 break;
@@ -288,6 +288,20 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 result.notImplemented();
                 break;
         }
+    }
+
+    private void setPictureInPictureAspectRatio(int width, int height) {
+        double ratio = (double) width / (double) height;
+
+        if (ratio > 2.39) {
+            width = 239;
+            height = 100;
+        } else if (ratio < 1 / 2.39) {
+            width = 100;
+            height = 239;
+        }
+
+        pictureInPictureAspectRatio = new Rational(width, height);
     }
 
 
