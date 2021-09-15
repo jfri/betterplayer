@@ -112,7 +112,7 @@ class _BetterPlayerState extends State<BetterPlayer>
     if (_isFullScreen) {
       Wakelock.disable();
       _navigatorState.maybePop();
-      SystemChrome.setEnabledSystemUIOverlays(_betterPlayerConfiguration.systemOverlaysAfterFullScreen);
+      SystemChrome.setEnabledSystemUIMode(_betterPlayerConfiguration.systemUiMode, overlays: _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
 
       if (_betterPlayerConfiguration.deviceOrientationsAfterFullScreen != null) {
         SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen!);
@@ -227,7 +227,7 @@ class _BetterPlayerState extends State<BetterPlayer>
       pageBuilder: _fullScreenRoutePageBuilder,
     );
 
-    await SystemChrome.setEnabledSystemUIOverlays([]);
+    await SystemChrome.setEnabledSystemUIMode(_betterPlayerConfiguration.systemUiMode, overlays: []);
 
     if (isAndroid) {
       if (_betterPlayerConfiguration.autoDetectFullscreenDeviceOrientation ==
@@ -270,7 +270,7 @@ class _BetterPlayerState extends State<BetterPlayer>
     // so we do not need to check Wakelock.isEnabled.
     Wakelock.disable();
 
-    await SystemChrome.setEnabledSystemUIOverlays(_betterPlayerConfiguration.systemOverlaysAfterFullScreen);
+    await SystemChrome.setEnabledSystemUIMode(_betterPlayerConfiguration.systemUiMode, overlays: _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
 
     if (_betterPlayerConfiguration.deviceOrientationsAfterFullScreen != null) {
       await SystemChrome.setPreferredOrientations(_betterPlayerConfiguration.deviceOrientationsAfterFullScreen!);

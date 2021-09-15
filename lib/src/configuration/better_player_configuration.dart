@@ -23,8 +23,7 @@ class BetterPlayerConfiguration {
 
   /// When the video playback runs  into an error, you can build a custom
   /// error message.
-  final Widget Function(BuildContext context, String? errorMessage)?
-      errorBuilder;
+  final Widget Function(BuildContext context, String? errorMessage)? errorBuilder;
 
   /// The Aspect Ratio of the Video. Important to get the correct size of the
   /// video!
@@ -112,6 +111,8 @@ class BetterPlayerConfiguration {
   ///Default value is true.
   final bool autoDispose;
 
+  final SystemUiMode systemUiMode;
+
   const BetterPlayerConfiguration({
     this.aspectRatio,
     this.autoPlay = false,
@@ -147,6 +148,7 @@ class BetterPlayerConfiguration {
     this.autoDetectFullscreenDeviceOrientation = false,
     this.handleLifecycle = true,
     this.autoDispose = true,
+    this.systemUiMode = SystemUiMode.edgeToEdge,
   });
 
   BetterPlayerConfiguration copyWith({
@@ -175,6 +177,7 @@ class BetterPlayerConfiguration {
     Function(double visibilityFraction)? playerVisibilityChangedBehavior,
     List<BetterPlayerTranslations>? translations,
     bool? autoDetectFullscreenDeviceOrientation,
+    SystemUiMode? systemUiMode,
   }) {
     return BetterPlayerConfiguration(
       aspectRatio: aspectRatio ?? this.aspectRatio,
@@ -183,34 +186,25 @@ class BetterPlayerConfiguration {
       looping: looping ?? this.looping,
       fullScreenByDefault: fullScreenByDefault ?? this.fullScreenByDefault,
       placeholder: placeholder ?? this.placeholder,
-      showPlaceholderUntilPlay:
-          showPlaceholderUntilPlay ?? this.showPlaceholderUntilPlay,
+      showPlaceholderUntilPlay: showPlaceholderUntilPlay ?? this.showPlaceholderUntilPlay,
       placeholderOnTop: placeholderOnTop ?? this.placeholderOnTop,
       overlay: overlay ?? this.overlay,
       errorBuilder: errorBuilder ?? this.errorBuilder,
       allowedScreenSleep: allowedScreenSleep ?? this.allowedScreenSleep,
-      fullScreenAspectRatio:
-          fullScreenAspectRatio ?? this.fullScreenAspectRatio,
-      deviceOrientationsOnFullScreen:
-          deviceOrientationsOnFullScreen ?? this.deviceOrientationsOnFullScreen,
-      systemOverlaysAfterFullScreen:
-          systemOverlaysAfterFullScreen ?? this.systemOverlaysAfterFullScreen,
-      deviceOrientationsAfterFullScreen: deviceOrientationsAfterFullScreen ??
-          this.deviceOrientationsAfterFullScreen,
+      fullScreenAspectRatio: fullScreenAspectRatio ?? this.fullScreenAspectRatio,
+      deviceOrientationsOnFullScreen: deviceOrientationsOnFullScreen ?? this.deviceOrientationsOnFullScreen,
+      systemOverlaysAfterFullScreen: systemOverlaysAfterFullScreen ?? this.systemOverlaysAfterFullScreen,
+      deviceOrientationsAfterFullScreen: deviceOrientationsAfterFullScreen ?? this.deviceOrientationsAfterFullScreen,
       routePageBuilder: routePageBuilder ?? this.routePageBuilder,
       eventListener: eventListener ?? this.eventListener,
-      subtitlesConfiguration:
-          subtitlesConfiguration ?? this.subtitlesConfiguration,
-      controlsConfiguration:
-          controlsConfiguration ?? this.controlsConfiguration,
+      subtitlesConfiguration: subtitlesConfiguration ?? this.subtitlesConfiguration,
+      controlsConfiguration: controlsConfiguration ?? this.controlsConfiguration,
       fit: fit ?? this.fit,
       rotation: rotation ?? this.rotation,
-      playerVisibilityChangedBehavior: playerVisibilityChangedBehavior ??
-          this.playerVisibilityChangedBehavior,
+      playerVisibilityChangedBehavior: playerVisibilityChangedBehavior ?? this.playerVisibilityChangedBehavior,
       translations: translations ?? this.translations,
-      autoDetectFullscreenDeviceOrientation:
-          autoDetectFullscreenDeviceOrientation ??
-              this.autoDetectFullscreenDeviceOrientation,
+      autoDetectFullscreenDeviceOrientation: autoDetectFullscreenDeviceOrientation ?? this.autoDetectFullscreenDeviceOrientation,
+      systemUiMode: systemUiMode ?? this.systemUiMode,
     );
   }
 }
