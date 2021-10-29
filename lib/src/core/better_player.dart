@@ -227,7 +227,7 @@ class _BetterPlayerState extends State<BetterPlayer>
       pageBuilder: _fullScreenRoutePageBuilder,
     );
 
-    await SystemChrome.setEnabledSystemUIMode(_betterPlayerConfiguration.systemUiMode, overlays: []);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
 
     if (isAndroid) {
       if (_betterPlayerConfiguration.autoDetectFullscreenDeviceOrientation ==
